@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -30,6 +31,10 @@ from trl.import_utils import is_npu_available, is_xpu_available
 
 tqdm.pandas()
 
+torch.set_default_tensor_type('torch.FloatTensor')
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+# 禁用MPS
+os.environ['ACCELERATE_TORCH_DEVICE'] = 'cpu'
 
 @dataclass
 class ScriptArguments:
@@ -40,8 +45,8 @@ class ScriptArguments:
             reward_model="sentiment-analysis:lvwerra/distilbert-imdb",
             learning_rate=1.41e-5,
             log_with=None,
-            mini_batch_size=128,
-            batch_size=128,
+            mini_batch_size=2,
+            batch_size=8,
             gradient_accumulation_steps=1,
             early_stopping=False,
             target_kl=6.0,
@@ -192,6 +197,9 @@ for epoch, batch in tqdm(enumerate(ppo_trainer.dataloader)):
     query_tensors = batch["input_ids"]
 
     # Get response from gpt2
+    # TODO: 这里应该是需要有一个参数同步的问题
+    #   response_tensors计算所需要的self.model，每个batch会更新，这是一个online的过程
+    #   ref_response_tensors计算所需要的self.ref_model，始终是初始模型，始终不变。
     response_tensors, ref_response_tensors = ppo_trainer.generate(
         query_tensors, return_prompt=False, generate_ref_response=True, **generation_kwargs
     )
